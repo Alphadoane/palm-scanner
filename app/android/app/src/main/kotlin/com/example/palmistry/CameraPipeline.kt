@@ -22,7 +22,7 @@ import java.util.concurrent.Executors
 
 class CameraPipeline(private val context: Context, private val onFrameProcessed: (List<String>, Float, List<Map<String, Any>>, List<List<Int>>, List<Map<String, Any>>) -> Unit) {
     
-    private val inferenceEngine = InferenceEngine()
+    private val inferenceEngine = InferenceEngine(context)
     private val temporalSmoother = TemporalSmoother()
     private val cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -94,9 +94,8 @@ class CameraPipeline(private val context: Context, private val onFrameProcessed:
 
     private fun processFrame(bitmap: Bitmap) {
         val segmentation = inferenceEngine.runSegmentation(bitmap)
-        val skeleton = inferenceEngine.skeletonize(segmentation)
-        val rawNodes = inferenceEngine.extractNodes(skeleton)
-        val edges = inferenceEngine.buildEdges(skeleton, rawNodes)
+        val rawNodes = inferenceEngine.extractNodes(segmentation)
+        val edges = inferenceEngine.buildEdges(rawNodes)
         val features = inferenceEngine.extractFeatures(rawNodes)
         val interpretation = inferenceEngine.interpret(features)
         
