@@ -1,0 +1,39 @@
+{
+  "rules": [
+    {
+      "id": "R001",
+      "if": {
+        "life_line.length": ">0.7",
+        "life_line.depth": ">0.5"
+      },
+      "then": {
+        "trait": "physical_vitality",
+        "value": "high",
+        "confidence": 0.82
+      }
+    },
+    {
+      "id": "R002",
+      "if": {
+        "heart_line.termination": "under_index"
+      },
+      "then": {
+        "trait": "emotional_idealism",
+        "value": "high",
+        "confidence": 0.76
+      }
+    },
+    {
+      "id": "R003",
+      "if": {
+        "head_line.length": ">0.8",
+        "head_line.curvature": "<0.3"
+      },
+      "then": {
+        "trait": "analytical_thinking",
+        "value": "high",
+        "confidence": 0.88
+      }
+    }
+  ]
+}
