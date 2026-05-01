@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/camera_screen.dart';
+import 'main_navigation.dart';
 
 void main() {
   runApp(const PalmistryApp());
@@ -12,11 +12,13 @@ class PalmistryApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AR Palmistry AI',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
         brightness: Brightness.dark,
+        primaryColor: Colors.blueAccent,
+        scaffoldBackgroundColor: Colors.black,
       ),
-      home: CameraScreen(),
+      home: const MainNavigation(),
     );
   }
 }

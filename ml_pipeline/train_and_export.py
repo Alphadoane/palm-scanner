@@ -73,8 +73,8 @@ def train_and_export():
     # --- FULL SPECTRUM PARAMETERS ---
     TRAIN_SIZE = 224 
     BATCH_SIZE = 2 # Reduced for 224x224 stability
-    NUM_SAMPLES = 1000 # Starting with 1000 for verification of the complex model
-    EPOCHS = 10
+    NUM_SAMPLES = 20
+    EPOCHS = 1
     NUM_CLASSES = 16
     
     print(f"Initializing Full-Spectrum Training (Samples: {NUM_SAMPLES}, Classes: {NUM_CLASSES})...")

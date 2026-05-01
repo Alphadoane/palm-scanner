@@ -20,17 +20,33 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
-class CameraPipeline(private val context: Context, private val onFrameProcessed: (List<String>, Float, List<Map<String, Any>>, List<List<Int>>, List<Map<String, Any>>) -> Unit) {
+class CameraPipeline(
+    private val context: Context, 
+    private val surfaceProvider: Preview.SurfaceProvider,
+    private val onFrameProcessed: (List<String>, Float, List<Map<String, Any>>, List<List<Int>>, List<Map<String, Any>>) -> Unit
+) {
     
     private val inferenceEngine = InferenceEngine(context)
     private val temporalSmoother = TemporalSmoother()
     private val cameraExecutor = Executors.newSingleThreadExecutor()
+
+    fun stopCameraPipeline() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            cameraProvider.unbindAll()
+        }, ContextCompat.getMainExecutor(context))
+        cameraExecutor.shutdown()
+    }
 
     fun startCameraPipeline() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
+
+            val preview = Preview.Builder().build()
+            preview.setSurfaceProvider(surfaceProvider)
 
             val imageAnalysis = ImageAnalysis.Builder()
                 .setTargetResolution(Size(224, 224))
@@ -46,13 +62,13 @@ class CameraPipeline(private val context: Context, private val onFrameProcessed:
             try {
                 cameraProvider.unbindAll()
                 if (context is LifecycleOwner) {
-                    cameraProvider.bindToLifecycle(context as LifecycleOwner, cameraSelector, imageAnalysis)
+                    val lifecycleOwner = context as LifecycleOwner
+                    cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalysis)
                 } else {
-                    // Fallback to simulated processing if context is not LifecycleOwner
                     simulateFrameProcessing()
                 }
             } catch (exc: Exception) {
-                // If binding fails, use simulator
+                exc.printStackTrace()
                 simulateFrameProcessing()
             }
         }, ContextCompat.getMainExecutor(context))

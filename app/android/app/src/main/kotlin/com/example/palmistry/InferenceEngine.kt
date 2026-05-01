@@ -109,10 +109,37 @@ class InferenceEngine(context: Context) {
 
     fun interpret(features: PalmFeatures): List<String> {
         val result = mutableListOf<String>()
-        if (features.lineScores.containsKey("life_line")) result.add("Strong Life Path")
-        if (features.lineScores.containsKey("fate_line")) result.add("Driven Personality")
-        if (features.lineScores.containsKey("money_line")) result.add("Financial Intuition")
-        if (features.lineScores.containsKey("ring_of_solomon")) result.add("Wisdom Seeker")
+        
+        // Apply Rules based on palm_rules.json
+        val lifeLineScore = features.lineScores["life_line"] ?: 0f
+        val headLineScore = features.lineScores["head_line"] ?: 0f
+        val heartLineScore = features.lineScores["heart_line"] ?: 0f
+        val fateLineScore = features.lineScores["fate_line"] ?: 0f
+
+        // Physical Vitality (R001)
+        if (lifeLineScore > 0.7f) {
+            result.add("Physical Vitality: High")
+        } else if (lifeLineScore > 0.3f) {
+            result.add("Physical Vitality: Moderate")
+        }
+
+        // Analytical Thinking (R003)
+        if (headLineScore > 0.8f) {
+            result.add("Analytical Thinking: High")
+        } else if (headLineScore > 0.4f) {
+            result.add("Pragmatic Thinking")
+        }
+
+        // Emotional Idealism (R002)
+        if (heartLineScore > 0.7f) {
+            result.add("Emotional Idealism: High")
+        }
+
+        // Fate and Direction
+        if (fateLineScore > 0.5f) {
+            result.add("Driven Personality")
+        }
+
         if (result.isEmpty()) result.add("Scanning for features...")
         return result
     }
