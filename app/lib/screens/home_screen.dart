@@ -123,40 +123,58 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildFeatureCard(BuildContext context,
       {required IconData icon, required String title, required String subtitle}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.blueAccent, size: 32),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.grey[900],
+            title: Text(title, style: const TextStyle(color: Colors.white)),
+            content: Text(
+              'This feature uses on-device AI to $subtitle. No data ever leaves your device.',
+              style: const TextStyle(color: Colors.white70),
             ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('GOT IT')),
+            ],
           ),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.blueAccent, size: 32),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

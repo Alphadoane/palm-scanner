@@ -4,20 +4,24 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/native_bridge.dart';
 import '../widgets/ar_overlay.dart';
 import '../widgets/confidence_card.dart';
+import '../widgets/scanning_beam.dart';
+import '../widgets/palm_label_chip.dart';
+import 'analysis_result_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   @override
   _CameraScreenState createState() => _CameraScreenState();
 }
 
-class _CameraScreenState extends State<CameraScreen> {
+class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderStateMixin {
   final NativeBridge bridge = NativeBridge();
   List<String> results = [];
   double confidence = 0.0;
   bool _isPermissionGranted = false;
   bool _isPermanentlyDenied = false;
   bool _showRetryButton = false;
-  int _retryCount = 0;
+  bool _isCapturing = false;
+  late AnimationController _flashController;
 
   // AR Overlay Data
   List<dynamic> nodes = [];
@@ -27,18 +31,26 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
+    _flashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
     _checkPermission();
     bridge.streamResults().listen((data) {
-      if (mounted) {
+      if (mounted && !_isCapturing) {
         setState(() {
           results = List<String>.from(data['labels'] ?? []);
           confidence = (data['confidence'] ?? 0.0).toDouble();
           nodes = data['nodes'] ?? [];
-          edges = data['edges'] ?? [];
-          labelPositions = data['labelPositions'] ?? [];
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _flashController.dispose();
+    super.dispose();
   }
 
   Future<void> _checkPermission() async {
@@ -59,7 +71,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
   void _startRetryTimer() {
     Future.delayed(const Duration(seconds: 5), () {
-      if (mounted && results.isEmpty && _isPermissionGranted) {
+      if (mounted && results.isEmpty && _isPermissionGranted && !_isCapturing) {
         setState(() {
           _showRetryButton = true;
         });
@@ -70,11 +82,56 @@ class _CameraScreenState extends State<CameraScreen> {
   void _handleRetry() {
     setState(() {
       _showRetryButton = false;
-      _retryCount++;
       results = [];
     });
     bridge.startCamera();
     _startRetryTimer();
+  }
+
+  void _handleCapture() async {
+    if (_isCapturing) return;
+
+    setState(() {
+      _isCapturing = true;
+    });
+
+    // Trigger flash effect
+    _flashController.forward().then((_) => _flashController.reverse());
+    HapticFeedback.heavyImpact();
+
+    // Call native capture and analyze
+    final data = await bridge.capture().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => null,
+    );
+
+    if (data != null && mounted) {
+      final capturedLabels = List<String>.from(data['labels'] ?? []);
+      final capturedConfidence = (data['confidence'] ?? 0.0).toDouble();
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AnalysisResultScreen(
+            labels: capturedLabels,
+            confidence: capturedConfidence,
+          ),
+        ),
+      ).then((_) {
+        if (mounted) {
+          setState(() {
+            _isCapturing = false;
+          });
+        }
+      });
+    } else if (mounted) {
+      setState(() {
+        _isCapturing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to analyze palm. Please try again.')),
+      );
+    }
   }
 
   @override
@@ -95,52 +152,14 @@ class _CameraScreenState extends State<CameraScreen> {
                     bridge.startCamera();
                   },
                 )
-              : Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _isPermanentlyDenied ? Icons.settings : Icons.camera_alt,
-                        color: Colors.white54,
-                        size: 64,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _isPermanentlyDenied
-                            ? "Camera access is permanently denied"
-                            : "Camera Permission Required",
-                        style: const TextStyle(color: Colors.white, fontSize: 18),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _isPermanentlyDenied
-                            ? openAppSettings
-                            : _checkPermission,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                        ),
-                        child: Text(_isPermanentlyDenied ? "Open Settings" : "Grant Permission"),
-                      ),
-                    ],
-                  ),
-                ),
+              : _buildPermissionDenied(),
           
-          // Back Button
-          Positioned(
-            top: 40,
-            left: 20,
-            child: CircleAvatar(
-              backgroundColor: Colors.black38,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-          
-          // AR Overlay rendering
-          if (_isPermissionGranted)
+          // Scanning Beam Animation
+          if (_isPermissionGranted && !_isCapturing)
+            const ScanningBeam(),
+
+          // AR Overlay (Preview Nodes)
+          if (_isPermissionGranted && !_isCapturing)
             PalmOverlay(
               labels: results,
               nodes: nodes,
@@ -148,73 +167,146 @@ class _CameraScreenState extends State<CameraScreen> {
               labelPositions: labelPositions,
             ),
           
-          // Results Panel at the bottom
-          if (_isPermissionGranted && results.isNotEmpty)
+          // Flash Effect Overlay
+          FadeTransition(
+            opacity: _flashController,
+            child: Container(color: Colors.white),
+          ),
+
+          // Navigation Back Button
+          Positioned(
+            top: 40,
+            left: 20,
+            child: CircleAvatar(
+              backgroundColor: Colors.black45,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+          
+          // Live Status Chips
+          if (_isPermissionGranted && results.isNotEmpty && !_isCapturing)
+            Positioned(
+              top: 150,
+              right: 20,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: results.take(2).map((label) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: PalmLabelChip(text: label),
+                )).toList(),
+              ),
+            ),
+
+          // Bottom Controls
+          if (_isPermissionGranted && !_isCapturing)
             Align(
               alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
+              child: Container(
+                padding: const EdgeInsets.only(bottom: 50.0),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.5)],
+                  ),
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ConfidenceCard(confidence: confidence),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white10),
-                      ),
-                      child: Column(
-                        children: results.map((label) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.auto_awesome, color: Colors.blueAccent, size: 18),
-                              const SizedBox(width: 12),
-                              Text(label, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
-                            ],
+                    const SizedBox(height: 30),
+                    // Standard Capture Button
+                    GestureDetector(
+                      onTap: _handleCapture,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            height: 84,
+                            width: 84,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 4),
+                            ),
                           ),
-                        )).toList(),
+                          Container(
+                            height: 70,
+                            width: 70,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "TAP TO SCAN PALM",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2.0,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          
-          // Scanning Indicator if no results yet
-          if (_isPermissionGranted && results.isEmpty)
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!_showRetryButton)
+
+          // Full-screen Loading/Analyzing Overlay
+          if (_isCapturing)
+            Container(
+              color: Colors.black.withOpacity(0.8),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     const CircularProgressIndicator(color: Colors.blueAccent),
-                  const SizedBox(height: 16),
-                  Text(
-                    _showRetryButton 
-                      ? "Still nothing? Try restarting the camera." 
-                      : "Align palm within view...",
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  if (_showRetryButton) ...[
-                    const SizedBox(height: 24),
-                    ElevatedButton.icon(
-                      onPressed: _handleRetry,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text("Retry Camera"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white10,
-                        foregroundColor: Colors.white,
+                    const SizedBox(height: 30),
+                    const Text(
+                      "EXTRACTING FEATURES...",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2.0,
                       ),
                     ),
                   ],
-                ],
+                ),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionDenied() {
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.no_photography_outlined, color: Colors.white24, size: 80),
+            const SizedBox(height: 20),
+            const Text("Camera Access Required", style: TextStyle(color: Colors.white, fontSize: 18)),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: _isPermanentlyDenied ? openAppSettings : _checkPermission,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: Text(_isPermanentlyDenied ? "Open Settings" : "Grant Access"),
+            ),
+          ],
+        ),
       ),
     );
   }

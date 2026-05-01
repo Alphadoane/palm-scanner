@@ -15,4 +15,14 @@ class NativeBridge {
       print("Failed to start camera: '${e}'.");
     }
   }
+
+  Future<Map<String, dynamic>?> capture() async {
+    try {
+      final result = await channel.invokeMethod('capture');
+      return Map<String, dynamic>.from(result);
+    } catch (e) {
+      print("Failed to capture: '${e}'.");
+      return null;
+    }
+  }
 }

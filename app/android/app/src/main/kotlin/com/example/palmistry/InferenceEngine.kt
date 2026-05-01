@@ -3,6 +3,7 @@ package com.example.palmistry
 import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
+import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
 import java.nio.ByteBuffer
@@ -28,10 +29,12 @@ class InferenceEngine(context: Context) {
 
     init {
         try {
+            Log.d("InferenceEngine", "Initializing InferenceEngine...")
             val modelFile = loadModelFile(context.assets, "palm_segmentation_full.tflite")
             interpreter = Interpreter(modelFile)
+            Log.d("InferenceEngine", "TFLite Interpreter created successfully")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("InferenceEngine", "FAILED to load TFLite model: ${e.message}", e)
         }
     }
 
@@ -58,7 +61,14 @@ class InferenceEngine(context: Context) {
         }
 
         val output = Array(1) { Array(224) { Array(224) { FloatArray(16) } } }
+        if (interpreter == null) {
+            Log.e("InferenceEngine", "Interpreter is NULL, skipping inference")
+            return output
+        }
+        
+        Log.d("InferenceEngine", "Running inference...")
         interpreter?.run(input, output)
+        Log.d("InferenceEngine", "Inference complete")
         return output
     }
 

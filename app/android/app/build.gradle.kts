@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.palmistry"
-    compileSdk = 34
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -21,7 +21,7 @@ android {
     defaultConfig {
         applicationId = "com.example.palmistry"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -30,6 +30,10 @@ android {
         release {
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    aaptOptions {
+        noCompress("tflite")
     }
 }
 

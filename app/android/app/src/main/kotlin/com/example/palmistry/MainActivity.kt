@@ -36,10 +36,27 @@ class MainActivity: FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
-                if (call.method == "startCamera") {
-                    startRequested = true
-                    tryStartCamera()
-                    result.success(null)
+                when (call.method) {
+                    "startCamera" -> {
+                        startRequested = true
+                        tryStartCamera()
+                        result.success(null)
+                    }
+                    "capture" -> {
+                        cameraPipeline?.captureNow { labels, confidence, nodes, edges, labelPositions ->
+                            val data = mapOf(
+                                "labels" to labels,
+                                "confidence" to confidence.toDouble(),
+                                "nodes" to nodes,
+                                "edges" to edges,
+                                "labelPositions" to labelPositions
+                            )
+                            Handler(Looper.getMainLooper()).post {
+                                result.success(data)
+                            }
+                        }
+                    }
+                    else -> result.notImplemented()
                 }
             }
 
